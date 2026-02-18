@@ -51,6 +51,12 @@ The goal is to provide an advanced, reliable classification and explanation tool
 
 - **`oxford_pets_binary_resnet101.yaml`** — experiment configuration (data, model, optimizer, scheduler, device)
 
+- **`airflow/`** — DAGs and logs for MLOps orchestration
+
+- **`scripts/`** and **`resnet101/scripts/`** — project CLIs (API/app launch, ingest, train, infer)
+
+- **`monitoring/`** — operational reports (drift, model health, quality gates, deployment history, rollback history)
+
 ---
 
 ##  Weights & Data
@@ -171,32 +177,54 @@ poetry run streamlit run app/app.py
 
 ## Option B — Run with Docker / Docker Compose (recommended)
 
-> Spin up **API** and **UI** in separate containers with a single command.
+> Run the MLOps services in independent containers (ingestion, training, deploy) and optionally run Airflow orchestration.
 
-### B.1 Build the image (if not already built)
+### B.1 Build service images (if not already built)
 
 ```bash
-docker build -t mi_app:latest_final .
+docker compose build
 ```
 
 ### B.2 Use `docker-compose.yml`
 
+**Ingestion stage**
+
 ```bash
-docker compose up -d
+docker compose run --rm ingestion
+```
+
+**Training stage (MLflow tracking enabled)**
+
+```bash
+docker compose run --rm training
+```
+
+**Deploy stage (API)**
+
+```bash
+docker compose up -d deploy
 ```
 
 - API: http://localhost:8000/docs
+
+If you want the Streamlit UI, run it locally with CLI:
+
+```bash
+python3 scripts/run_app.py --host 0.0.0.0 --port 8501
+```
+
 - UI: http://localhost:8501
 
 ### B.3 Useful Commands
 
 ```bash
 # Start in detached mode
-docker compose up -d
+docker compose up -d deploy
 
-# View logs (API / UI)
-docker compose logs -f api
-docker compose logs -f ui
+# View logs (MLOps services)
+docker compose logs -f ingestion
+docker compose logs -f training
+docker compose logs -f deploy
 
 # Rebuild & restart after code changes
 docker compose up -d --build
@@ -205,11 +233,97 @@ docker compose up -d --build
 docker compose down
 ```
 
+### B.4 Airflow Orchestration Stack (optional but recommended)
+
+```bash
+docker compose -f docker-compose.airflow.yml up -d --build
+```
+
+- Airflow UI: http://localhost:8080
+- Main DAG: `resnet101_mlops_orchestrator`
+
 ### 🛠️ Common Issues
 
 - **Weights not found**: check the path `resnet101/model_trained/ResNet101.pth`.
 - **CORS / App–API connection**: verify `API_BASE_URL` and ensure Uvicorn is running at `127.0.0.1:8000`.
-- **Dependencies**: reinstall with `poetry install` or update with `poetry update`.
+- **Dependencies**: reinstall with `poetry install` / `pip install -r requirements-mlops.txt`.
+- **Airflow cannot run Docker commands**: verify Docker socket mount (`/var/run/docker.sock`) in `docker-compose.airflow.yml`.
+
+---
+
+##  CLI Commands
+
+### Project-level CLIs (`scripts/`)
+
+```bash
+# Run API
+python3 scripts/run_api.py --host 0.0.0.0 --port 8000
+
+# Run Streamlit app
+python3 scripts/run_app.py --host 0.0.0.0 --port 8501
+```
+
+### ResNet/MLOps CLIs (`resnet101/scripts/`)
+
+```bash
+# Data ingestion
+python3 resnet101/scripts/cli_ingest.py --data-dir data --stats-path data/pet_stats.json
+
+# Training (MLflow)
+python3 resnet101/scripts/cli_train.py \
+  --config resnet101/oxford_pets_binary_resnet101.yaml \
+  --output-dir resnet101/model_trained/mlops \
+  --tracking-uri file:./resnet101/mlruns
+
+# Quick inference by image path
+python3 resnet101/scripts/cli_infer.py \
+  --image-path data/processed/examples_oxford/cat_example.jpg --pretty
+```
+
+---
+
+##  MLOps Lifecycle (Implemented)
+
+This repository now includes a complete operational MLOps loop:
+
+1. **Ingestion** (`ingestion` service / `cli_ingest.py`)
+2. **Training + Tracking** (`training` service / MLflow)
+3. **Quality Gate** (`src/mlops/quality_gate.py`)
+4. **Promotion to deployment model** (`src/mlops/deployment_manager.py --action promote`)
+5. **API deployment** (`deploy` service)
+6. **Monitoring**:
+   - Drift detection (`src/mlops/detect_drift.py`)
+   - Model health (`src/mlops/evaluate_model_health.py`)
+7. **Automatic retraining decision** (Airflow DAG branching)
+8. **Automatic rollback** if quality gate fails or post-deploy health degrades
+
+Operational reports are stored in `monitoring/` (JSON/JSONL), including:
+
+- `drift_report.json`
+- `model_health_report.json`
+- `quality_gate_report_*.json`
+- `deployment_history.jsonl`
+- `rollback_history.jsonl`
+- `orchestration_report.json`
+
+---
+
+##  Airflow Orchestration
+
+The DAG `resnet101_mlops_orchestrator` orchestrates bootstrap + continuous monitoring + retraining + rollback.
+
+```bash
+docker compose -f docker-compose.airflow.yml up -d --build
+```
+
+- UI: http://localhost:8080
+- Schedule: every 2 hours
+- Decision logic:
+  - Retrain if drift is detected or model behavior degrades.
+  - Promote only if quality gates pass.
+  - Rollback automatically if post-deploy checks fail.
+
+For orchestration details, see: `AIRFLOW_ORCHESTRATION.md`
 
 ---
 
@@ -324,6 +438,8 @@ docker compose down
 - Centralized **YAML** config (dataset, normalization, architecture, optimizer, scheduler).
 - Normalization statistics cached in `data/pet_stats.json`.
 - Controlled seeds and devices (CPU/CUDA).
+- Reproducible MLOps stages through Docker services + Airflow DAG orchestration.
+- Quality gates and deployment/rollback history persisted under `monitoring/`.
 
 ---
 

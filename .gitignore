@@ -207,6 +207,8 @@ resnet101/model_trained/mlops/
 monitoring/*.json
 monitoring/*.jsonl
 !monitoring/.gitkeep
+airflow/logs/*
+!airflow/logs/.gitkeep
 
 # Marimo
 marimo/_static/

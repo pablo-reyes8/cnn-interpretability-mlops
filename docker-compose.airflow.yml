@@ -1,0 +1,20 @@
+services:
+  airflow:
+    build:
+      context: .
+      dockerfile: docker/airflow.Dockerfile
+    container_name: airflow-mlops
+    command: standalone
+    ports:
+      - "8080:8080"
+    environment:
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
+      AIRFLOW__CORE__EXECUTOR: "SequentialExecutor"
+      PROJECT_ROOT: /opt/airflow/project
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/logs:/opt/airflow/logs
+      - ./:/opt/airflow/project
+      - /var/run/docker.sock:/var/run/docker.sock
+

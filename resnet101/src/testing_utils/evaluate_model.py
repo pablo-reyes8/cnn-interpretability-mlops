@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.metrics import classification_report, roc_curve, auc, roc_auc_score
 from sklearn.preprocessing import label_binarize
-import matplotlib.pyplot as plt
 
 
 def evaluate_model(model, val_loader, criterion, *, device="cuda", multiclass=False, plot=True):
@@ -49,7 +48,8 @@ def evaluate_model(model, val_loader, criterion, *, device="cuda", multiclass=Fa
     y_pred = np.asarray(y_pred)
     y_score = np.concatenate(y_score_all, axis=0)
 
-    report = classification_report(y_true, y_pred, digits=4)
+    report = classification_report(y_true, y_pred, digits=4, zero_division=0)
+    report_dict = classification_report(y_true, y_pred, output_dict=True, zero_division=0)
 
     if multiclass:
         num_classes = y_score.shape[1]
@@ -80,7 +80,13 @@ def evaluate_model(model, val_loader, criterion, *, device="cuda", multiclass=Fa
     print(f"Val Loss: {avg_loss:.4f}  |  ROC-AUC: {roc_auc:.4f}")
     print("\nClassification report\n" + report)
 
-    return {"val_loss": avg_loss,
+    return {
+        "val_loss": avg_loss,
         "roc_auc": roc_auc,
-        "report": report}
+        "report": report,
+        "report_dict": report_dict,
+        "val_acc": float(report_dict.get("accuracy", 0.0)),
+        "macro_f1": float(report_dict.get("macro avg", {}).get("f1-score", 0.0)),
+        "weighted_f1": float(report_dict.get("weighted avg", {}).get("f1-score", 0.0)),
+    }
 

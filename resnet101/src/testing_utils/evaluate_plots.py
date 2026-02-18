@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import torch.nn.functional as F
 import math
 
-from src.testing_utils.test_utils import *
+from .test_utils import *
 
 
 

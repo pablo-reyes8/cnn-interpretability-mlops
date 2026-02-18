@@ -5,7 +5,7 @@ import torch
 from torch.utils.data import DataLoader, random_split, Subset, Dataset
 
 
-from src.data.utils_data import *
+from .utils_data import *
 
 
 class OxfordPetsBinary(torch.utils.data.Dataset):

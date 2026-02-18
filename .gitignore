@@ -201,6 +201,10 @@ cython_debug/
 .cursorignore
 .cursorindexingignore
 
+# MLOps artifacts
+resnet101/mlruns/
+resnet101/model_trained/mlops/
+
 # Marimo
 marimo/_static/
 marimo/_lsp/

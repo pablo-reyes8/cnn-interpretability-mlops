@@ -1,0 +1,4 @@
+train:
+  config_path: resnet101/oxford_pets_binary_resnet101.yaml
+  output_dir: resnet101/model_trained/mlops
+  tracking_uri: file:./resnet101/mlruns

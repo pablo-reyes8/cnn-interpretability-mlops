@@ -1,0 +1,45 @@
+stages:
+  train_resnet101_mlflow:
+    cmd: >-
+      python3 -m resnet101.src.training.train_mlflow
+      --config ${train.config_path}
+      --output-dir ${train.output_dir}
+      --tracking-uri ${train.tracking_uri}
+    deps:
+      - ${train.config_path}
+      - data/pet_stats.json
+      - resnet101/src/data/load_data.py
+      - resnet101/src/data/utils_data.py
+      - resnet101/src/model/resnet.py
+      - resnet101/src/model/resnet_bloks.py
+      - resnet101/src/model/save_model.py
+      - resnet101/src/testing_utils/evaluate_model.py
+      - resnet101/src/training/train_loop.py
+      - resnet101/src/training/train_utils.py
+      - resnet101/src/training/train_mlflow.py
+    params:
+      - params.yaml:
+          - train.config_path
+          - train.output_dir
+          - train.tracking_uri
+      - resnet101/oxford_pets_binary_resnet101.yaml:
+          - experiment.seed
+          - data.img_size
+          - data.loader.batch_size
+          - data.loader.num_workers
+          - data.split.val_split
+          - model.blocks_per_stage
+          - model.first_block
+          - model.init
+          - training.epochs
+          - training.amp
+          - training.optimizer.name
+          - training.optimizer.lr
+          - training.optimizer.weight_decay
+          - training.scheduler.name
+    metrics:
+      - ${train.output_dir}/metrics.json:
+          cache: false
+    outs:
+      - ${train.output_dir}/best_model.pth
+      - ${train.output_dir}/last_model.pth

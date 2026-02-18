@@ -1,6 +1,6 @@
 import torch
 
-from src.training.train_utils import *
+from .train_utils import *
 
 def train_epoch_classification(dataloader,
     model,optimizer,

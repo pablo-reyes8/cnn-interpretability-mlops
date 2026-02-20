@@ -445,7 +445,7 @@ For orchestration details, see: `AIRFLOW_ORCHESTRATION.md`
 
 ## 📄 License & Credits
 
-- Intended for **educational and research** use.
+- Intended for **research and MLOps** use.
 - Please cite **He et al., 2016** (ResNet) and the original interpretability works used in this project.
 - Thanks to the PyTorch community and the Oxford-IIIT Pet dataset.
 

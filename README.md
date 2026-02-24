@@ -438,7 +438,7 @@ For orchestration details, see: `AIRFLOW_ORCHESTRATION.md`
 - Centralized **YAML** config (dataset, normalization, architecture, optimizer, scheduler).
 - Normalization statistics cached in `data/pet_stats.json`.
 - Controlled seeds and devices (CPU/CUDA).
-- Reproducible MLOps stages through Docker services + Airflow DAG orchestration.
+- Reproducible MLOps stages through MLFlow + Docker services + Airflow DAG orchestration.
 - Quality gates and deployment/rollback history persisted under `monitoring/`.
 
 ---

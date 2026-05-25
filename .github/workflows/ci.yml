@@ -56,11 +56,14 @@ jobs:
           PY
 
       - name: Compile Python modules
+        env:
+          PYTHONPATH: ${{ github.workspace }}
         run: |
           python -m compileall src resnet101 data/create_dataset tests
 
       - name: Run tests
         env:
           ENABLE_INFERENCE_LOGGING: "false"
+          PYTHONPATH: ${{ github.workspace }}
         run: |
-          pytest -q
+          python -m pytest -q

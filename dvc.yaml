@@ -1,3 +1,6 @@
+vars:
+  - config/params.yaml
+
 stages:
   dataops_preprocess:
     cmd: >-
@@ -7,15 +10,16 @@ stages:
     deps:
       - ${dataops.config_path}
       - data/DATAOPS.md
-      - data/data_governance.yaml
+      - ${dataops.governance_path}
       - data/create_dataset/preprocess_training_data.py
       - resnet101/src/data/load_data.py
       - resnet101/src/data/utils_data.py
     params:
-      - params.yaml:
+      - config/params.yaml:
           - dataops.config_path
+          - dataops.governance_path
           - dataops.preprocess_report_path
-      - resnet101/oxford_pets_binary_resnet101.yaml:
+      - ${dataops.config_path}:
           - experiment.seed
           - data.dataset
           - data.task
@@ -50,11 +54,11 @@ stages:
       - resnet101/src/training/train_utils.py
       - resnet101/src/training/train_mlflow.py
     params:
-      - params.yaml:
+      - config/params.yaml:
           - train.config_path
           - train.output_dir
           - train.tracking_uri
-      - resnet101/oxford_pets_binary_resnet101.yaml:
+      - ${train.config_path}:
           - experiment.seed
           - data.img_size
           - data.loader.batch_size
@@ -84,7 +88,7 @@ stages:
     deps:
       - src/mlops/software_monitor.py
     params:
-      - params.yaml:
+      - config/params.yaml:
           - monitoring.inference_log_path
           - monitoring.software_report_path
     metrics:
@@ -104,7 +108,7 @@ stages:
       - src/mlops/detect_drift.py
       - src/mlops/drift_core.py
     params:
-      - params.yaml:
+      - config/params.yaml:
           - monitoring.inference_log_path
           - monitoring.feedback_log_path
           - monitoring.drift_report_path
@@ -121,7 +125,7 @@ stages:
     deps:
       - src/mlops/evaluate_model_health.py
     params:
-      - params.yaml:
+      - config/params.yaml:
           - monitoring.inference_log_path
           - monitoring.feedback_log_path
           - monitoring.model_health_report_path

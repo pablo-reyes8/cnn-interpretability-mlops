@@ -1,0 +1,31 @@
+monitoring:
+  window_size: 300
+  min_samples: 50
+  software:
+    max_p95_latency_ms: 2000.0
+    max_p95_inference_ms: 800.0
+  drift:
+    mean_shift_threshold: 0.35
+    scale_shift_threshold: 0.25
+    min_avg_confidence: 0.60
+    prediction_shift_threshold: 0.30
+    label_shift_threshold: 0.30
+    min_feedback_samples: 20
+    min_feedback_accuracy: 0.80
+  model_health:
+    stale_hours: 48.0
+    min_avg_confidence: 0.60
+    uncertain_threshold: 0.55
+    max_uncertain_rate: 0.40
+    min_feedback_samples: 20
+    min_feedback_accuracy: 0.80
+    min_feedback_roc_auc: 0.80
+    positive_label: dog
+
+quality_gate:
+  min_val_roc_auc: 0.85
+  min_val_acc: 0.80
+  max_val_loss: 0.70
+  min_delta_roc_auc: -0.01
+  min_delta_acc: -0.02
+  max_delta_loss: 0.05

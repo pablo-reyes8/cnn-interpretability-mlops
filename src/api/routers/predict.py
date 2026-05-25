@@ -81,6 +81,8 @@ async def _prep_input_from_request(file: Optional[UploadFile], url: Optional[str
         raise HTTPException(status_code=400, detail=str(e)) from e
     except TimeoutError:
         raise HTTPException(status_code=504, detail="Timeout al descargar la imagen.")
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
@@ -301,6 +303,5 @@ async def predict_advanced(
         "scores": scores,
         "meta": meta,
         "artifacts": artifacts,}
-
 
 

@@ -333,7 +333,7 @@ def parse_args():
     parser.add_argument(
         "--config",
         type=str,
-        default="resnet101/oxford_pets_binary_resnet101.yaml",
+        default="config/model/oxford_pets_binary_resnet101.yaml",
         help="Ruta al YAML de configuracion de experimento.",
     )
     parser.add_argument(

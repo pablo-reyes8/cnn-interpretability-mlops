@@ -42,16 +42,23 @@ The goal is to provide an advanced, reliable classification and explanation tool
 
 - **`app/`** — user interface (Streamlit) to upload images/URLs and explore explanations
 
-- **`data/`** — DataOps, data contracts, preprocessing and statistics
+- **`config/`** — centralized YAML configuration for API, model training, DataOps and monitoring
+
+  - `api.yaml` — API paths, IO limits, timeouts and model loading config
+  - `model/oxford_pets_binary_resnet101.yaml` — experiment configuration
+  - `data_governance.yaml` — explicit DataOps governance and data contract
+  - `mlops.yaml` and `params.yaml` — monitoring thresholds and DVC pipeline parameters
+
+- **`data/`** — DataOps documentation, preprocessing and statistics
 
   - `processed/` — working directory (do not version raw data)
   - `pet_stats.json` — means/standard deviations for reproducible normalization
-  - `DATAOPS.md` and `data_governance.yaml` — explicit governance and data contract
+  - `DATAOPS.md` — operational DataOps notes
   - `create_dataset/preprocess_training_data.py` — reproducible training preprocessing report
 
 - **`notebooks/`** — data-flow verification and model sanity checks
 
-- **`oxford_pets_binary_resnet101.yaml`** — experiment configuration (data, model, optimizer, scheduler, device)
+- **`config/model/oxford_pets_binary_resnet101.yaml`** — experiment configuration (data, model, optimizer, scheduler, device)
 
 - **`airflow/`** — DAGs and logs for MLOps orchestration
 
@@ -273,7 +280,7 @@ python3 resnet101/scripts/cli_ingest.py --data-dir data --stats-path data/pet_st
 
 # Training (MLflow)
 python3 resnet101/scripts/cli_train.py \
-  --config resnet101/oxford_pets_binary_resnet101.yaml \
+  --config config/model/oxford_pets_binary_resnet101.yaml \
   --output-dir resnet101/model_trained/mlops \
   --tracking-uri file:./resnet101/mlruns
 
@@ -287,7 +294,7 @@ python3 resnet101/scripts/cli_infer.py \
 ```bash
 # DataOps contract/preprocessing report
 python3 data/create_dataset/preprocess_training_data.py \
-  --config-path resnet101/oxford_pets_binary_resnet101.yaml \
+  --config-path config/model/oxford_pets_binary_resnet101.yaml \
   --report-path monitoring/dataops_preprocess_report.json
 
 # Software monitoring: latency, inference time and endpoint counts

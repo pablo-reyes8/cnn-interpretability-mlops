@@ -10,7 +10,7 @@ pip install -r requirements-mlops.txt
 
 ```bash
 python3 -m resnet101.src.training.train_mlflow \
-  --config resnet101/oxford_pets_binary_resnet101.yaml \
+  --config config/model/oxford_pets_binary_resnet101.yaml \
   --output-dir resnet101/model_trained/mlops \
   --tracking-uri file:./resnet101/mlruns
 ```

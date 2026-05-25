@@ -1,0 +1,27 @@
+api:
+  model_name: ResNet101
+  model_version: 1.0.0
+  input_size: 224
+  allowed_exts:
+    - .jpg
+    - .jpeg
+    - .png
+  allowed_mimes:
+    - image/jpeg
+    - image/png
+  max_image_mb: 5
+  timeout_connect: 5.0
+  timeout_read: 10.0
+  resize_scale: 1.14
+  device_policy: auto
+
+paths:
+  pet_stats: data/pet_stats.json
+  model_meta: models/meta.json
+  model_weights: resnet101/model_trained/ResNet101.pth
+  model_config: config/model/oxford_pets_binary_resnet101.yaml
+  resnet_src: resnet101/src
+
+monitoring:
+  enable_inference_logging: true
+  inference_log_path: monitoring/inference_events.jsonl

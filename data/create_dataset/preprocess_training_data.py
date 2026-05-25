@@ -121,7 +121,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="DataOps: materializa y valida el preprocesamiento de entrenamiento."
     )
-    parser.add_argument("--config-path", type=str, default="resnet101/oxford_pets_binary_resnet101.yaml")
+    parser.add_argument("--config-path", type=str, default="config/model/oxford_pets_binary_resnet101.yaml")
     parser.add_argument("--report-path", type=str, default="monitoring/dataops_preprocess_report.json")
     return parser.parse_args()
 

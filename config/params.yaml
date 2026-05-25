@@ -1,13 +1,15 @@
 train:
-  config_path: resnet101/oxford_pets_binary_resnet101.yaml
+  config_path: config/model/oxford_pets_binary_resnet101.yaml
   output_dir: resnet101/model_trained/mlops
   tracking_uri: file:./resnet101/mlruns
 
 dataops:
-  config_path: resnet101/oxford_pets_binary_resnet101.yaml
+  config_path: config/model/oxford_pets_binary_resnet101.yaml
+  governance_path: config/data_governance.yaml
   preprocess_report_path: monitoring/dataops_preprocess_report.json
 
 monitoring:
+  config_path: config/mlops.yaml
   inference_log_path: monitoring/inference_events.jsonl
   feedback_log_path: monitoring/feedback_events.jsonl
   software_report_path: monitoring/software_metrics_report.json

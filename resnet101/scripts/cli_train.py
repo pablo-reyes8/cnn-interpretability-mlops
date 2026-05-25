@@ -3,7 +3,7 @@ import argparse
 
 def parse_args():
     parser = argparse.ArgumentParser(description="CLI ResNet101 para entrenamiento con MLflow.")
-    parser.add_argument("--config", type=str, default="resnet101/oxford_pets_binary_resnet101.yaml")
+    parser.add_argument("--config", type=str, default="config/model/oxford_pets_binary_resnet101.yaml")
     parser.add_argument("--output-dir", type=str, default="resnet101/model_trained/mlops")
     parser.add_argument("--tracking-uri", type=str, default="file:./resnet101/mlruns")
     parser.add_argument("--experiment-name", type=str, default=None)

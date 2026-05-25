@@ -19,7 +19,7 @@ services:
       dockerfile: docker/training.Dockerfile
     command: >-
       python3 resnet101/scripts/cli_train.py
-      --config /workspace/resnet101/oxford_pets_binary_resnet101.yaml
+      --config /workspace/config/model/oxford_pets_binary_resnet101.yaml
       --output-dir /workspace/resnet101/model_trained/mlops
       --tracking-uri file:/workspace/resnet101/mlruns
     volumes:

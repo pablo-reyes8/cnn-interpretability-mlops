@@ -24,7 +24,7 @@ def parse_args():
     parser.add_argument(
         "--train-config",
         type=str,
-        default="resnet101/oxford_pets_binary_resnet101.yaml",
+        default="config/model/oxford_pets_binary_resnet101.yaml",
     )
     parser.add_argument(
         "--train-output-dir",

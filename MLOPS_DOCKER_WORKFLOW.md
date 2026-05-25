@@ -70,7 +70,7 @@ python3 -m src.mlops.retrain_if_drift \
   --inference-log-path monitoring/inference_events.jsonl \
   --drift-report-path monitoring/drift_report.json \
   --retrain-report-path monitoring/retrain_report.json \
-  --train-config resnet101/oxford_pets_binary_resnet101.yaml \
+  --train-config config/model/oxford_pets_binary_resnet101.yaml \
   --train-output-dir resnet101/model_trained/mlops \
   --tracking-uri file:./resnet101/mlruns
 ```

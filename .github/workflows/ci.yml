@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Lint configs and run tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-mlops.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: Validate YAML configs
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import yaml
+
+          paths = [
+              Path("config/api.yaml"),
+              Path("config/params.yaml"),
+              Path("config/mlops.yaml"),
+              Path("config/data_governance.yaml"),
+              Path("config/model/oxford_pets_binary_resnet101.yaml"),
+              Path("dvc.yaml"),
+              Path("docker-compose.yml"),
+              Path("docker-compose.airflow.yml"),
+          ]
+          for path in paths:
+              payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+              if not isinstance(payload, dict):
+                  raise SystemExit(f"{path} did not parse as a YAML mapping")
+              print(f"OK {path}")
+          PY
+
+      - name: Compile Python modules
+        run: |
+          python -m compileall src resnet101 data/create_dataset tests
+
+      - name: Run tests
+        env:
+          ENABLE_INFERENCE_LOGGING: "false"
+        run: |
+          pytest -q

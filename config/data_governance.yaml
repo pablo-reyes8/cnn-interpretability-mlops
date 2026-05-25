@@ -22,7 +22,7 @@ storage_policy:
     - data/pet_stats.json
     - data/processed/examples_oxford/*
     - data/DATAOPS.md
-    - data/data_governance.yaml
+    - config/data_governance.yaml
   operational_reports_path: monitoring/
 
 schema:

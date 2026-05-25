@@ -66,14 +66,14 @@ Visual results generated during training/evaluation:
 
 ### 7. Config & Notebooks
 
-- **`oxford_pets_binary_resnet101.yaml`** – experiment configuration (data, model, optimizer, scheduler, results).
+- **`../config/model/oxford_pets_binary_resnet101.yaml`** – experiment configuration (data, model, optimizer, scheduler, results).
 - **`Resnet101.ipynb`** – Jupyter notebook with full training workflow.
 
 ---
 
 ## Training Setup
 
-Training is configured via `oxford_pets_binary_resnet101.yaml`:
+Training is configured via `config/model/oxford_pets_binary_resnet101.yaml`:
 
 - **Dataset**: Oxford-IIIT Pet (binary task: cat vs dog).
 - **Model**: ResNet-101-like (`blocks_per_stage=(3,4,23,3)`).

@@ -21,7 +21,7 @@ This directory defines the operational data contract used by the project. The go
 
 ## Data Contract
 
-The `data/data_governance.yaml` file declares:
+The `config/data_governance.yaml` file declares:
 
 - source, license and restrictions;
 - expected image schema;
@@ -38,7 +38,7 @@ Run:
 
 ```bash
 python3 data/create_dataset/preprocess_training_data.py \
-  --config-path resnet101/oxford_pets_binary_resnet101.yaml \
+  --config-path config/model/oxford_pets_binary_resnet101.yaml \
   --report-path monitoring/dataops_preprocess_report.json
 ```
 

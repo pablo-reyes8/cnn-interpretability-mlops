@@ -63,22 +63,67 @@ def _extract_confidence(events: list[dict[str, Any]]) -> np.ndarray:
     return np.asarray(out, dtype=np.float64)
 
 
+def _distribution(events: list[dict[str, Any]], field: str) -> dict[str, float]:
+    counts: dict[str, int] = {}
+    for e in events:
+        value = e.get(field)
+        if isinstance(value, str) and value.strip():
+            key = value.strip().lower()
+            counts[key] = counts.get(key, 0) + 1
+    total = sum(counts.values())
+    if total == 0:
+        return {}
+    return {k: v / total for k, v in sorted(counts.items())}
+
+
+def _total_variation_distance(current: dict[str, float], expected: dict[str, float]) -> float | None:
+    if not current or not expected:
+        return None
+    keys = set(current) | set(expected)
+    return float(0.5 * sum(abs(current.get(k, 0.0) - expected.get(k, 0.0)) for k in keys))
+
+
+def _feedback_accuracy(feedback_events: list[dict[str, Any]]) -> tuple[int, float | None]:
+    vals: list[bool] = []
+    for e in feedback_events:
+        if isinstance(e.get("prediction_correct"), bool):
+            vals.append(bool(e["prediction_correct"]))
+            continue
+        pred = e.get("prediction")
+        true_label = e.get("true_label")
+        if isinstance(pred, str) and isinstance(true_label, str):
+            vals.append(pred.strip().lower() == true_label.strip().lower())
+    if not vals:
+        return 0, None
+    return len(vals), float(sum(1 for v in vals if v) / len(vals))
+
+
 def analyze_drift(
     *,
     reference_stats_path: str,
     inference_log_path: str,
+    feedback_log_path: str | None = None,
     window_size: int = 300,
     min_samples: int = 50,
     mean_shift_threshold: float = 0.35,
     scale_shift_threshold: float = 0.25,
     min_avg_confidence: float = 0.60,
+    prediction_shift_threshold: float = 0.30,
+    label_shift_threshold: float = 0.30,
+    min_feedback_samples: int = 20,
+    min_feedback_accuracy: float = 0.80,
+    expected_prediction_distribution: dict[str, float] | None = None,
+    expected_label_distribution: dict[str, float] | None = None,
 ) -> Dict[str, Any]:
     ref_loc, ref_scale = load_reference_stats(reference_stats_path)
     events = load_inference_events(inference_log_path, window_size=window_size)
+    feedback_events = load_inference_events(feedback_log_path, window_size=window_size) if feedback_log_path else []
 
     channel_means = _extract_matrix(events, "raw_channel_mean")
     channel_stds = _extract_matrix(events, "raw_channel_std")
     confidence = _extract_confidence(events)
+    prediction_distribution = _distribution(events, "prediction")
+    true_label_distribution = _distribution(feedback_events, "true_label")
 
     sample_count = int(min(len(channel_means), len(channel_stds)))
     if sample_count < min_samples:
@@ -89,6 +134,12 @@ def analyze_drift(
             "samples": sample_count,
             "min_samples_required": min_samples,
             "window_size": window_size,
+            "drift_types": {
+                "data_drift": False,
+                "model_drift": False,
+                "problem_drift": False,
+                "concept_drift": False,
+            },
         }
 
     means_window = channel_means[:sample_count]
@@ -106,7 +157,24 @@ def analyze_drift(
     mean_flag = bool(np.any(mean_shift_sigma > mean_shift_threshold))
     scale_flag = bool(np.any(scale_shift_ratio > scale_shift_threshold))
     conf_flag = bool(avg_conf < min_avg_confidence) if confidence_window.size else False
-    drift_detected = bool(mean_flag or scale_flag or conf_flag)
+    expected_pred_dist = expected_prediction_distribution or {"cat": 0.5, "dog": 0.5}
+    expected_label_dist = expected_label_distribution or expected_pred_dist
+    prediction_tvd = _total_variation_distance(prediction_distribution, expected_pred_dist)
+    label_tvd = _total_variation_distance(true_label_distribution, expected_label_dist)
+    feedback_count, feedback_acc = _feedback_accuracy(feedback_events)
+
+    prediction_flag = prediction_tvd is not None and prediction_tvd > prediction_shift_threshold
+    label_flag = label_tvd is not None and label_tvd > label_shift_threshold
+    concept_flag = (
+        feedback_acc is not None
+        and feedback_count >= min_feedback_samples
+        and feedback_acc < min_feedback_accuracy
+    )
+
+    data_drift = bool(mean_flag or scale_flag)
+    model_drift = bool(conf_flag or prediction_flag)
+    problem_drift = bool(label_flag)
+    drift_detected = bool(data_drift or model_drift or problem_drift or concept_flag)
 
     return {
         "timestamp_utc": datetime.now(timezone.utc).isoformat(),
@@ -122,21 +190,41 @@ def analyze_drift(
             "loc": curr_loc.tolist(),
             "scale": curr_scale.tolist(),
             "avg_confidence": avg_conf,
+            "prediction_distribution": prediction_distribution,
+            "true_label_distribution": true_label_distribution,
+            "feedback_accuracy": feedback_acc,
+            "feedback_samples": feedback_count,
         },
         "thresholds": {
             "mean_shift_sigma": mean_shift_threshold,
             "scale_shift_ratio": scale_shift_threshold,
             "min_avg_confidence": min_avg_confidence,
+            "prediction_shift_tvd": prediction_shift_threshold,
+            "label_shift_tvd": label_shift_threshold,
+            "min_feedback_samples": min_feedback_samples,
+            "min_feedback_accuracy": min_feedback_accuracy,
         },
         "signals": {
             "mean_shift_sigma": mean_shift_sigma.tolist(),
             "scale_shift_ratio": scale_shift_ratio.tolist(),
             "low_confidence": conf_flag,
+            "prediction_distribution_tvd": prediction_tvd,
+            "true_label_distribution_tvd": label_tvd,
+            "low_feedback_accuracy": concept_flag,
         },
         "flags": {
             "mean_shift": mean_flag,
             "scale_shift": scale_flag,
             "confidence_shift": conf_flag,
+            "prediction_distribution_shift": prediction_flag,
+            "true_label_distribution_shift": label_flag,
+            "feedback_performance_shift": concept_flag,
+        },
+        "drift_types": {
+            "data_drift": data_drift,
+            "model_drift": model_drift,
+            "problem_drift": problem_drift,
+            "concept_drift": concept_flag,
         },
     }
 

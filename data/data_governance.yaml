@@ -1,0 +1,96 @@
+dataset:
+  name: Oxford-IIIT Pet
+  task: binary_classification
+  classes:
+    - cat
+    - dog
+  positive_class: dog
+  source_url: https://www.robots.ox.ac.uk/~vgg/data/pets/
+  license_note: Use for research/education according to the original dataset terms.
+
+ownership:
+  data_steward: academic_project_team
+  model_owner: mlops_project_team
+  consumers:
+    - training_pipeline
+    - inference_api
+    - monitoring_jobs
+
+storage_policy:
+  raw_data_versioned_in_git: false
+  allowed_versioned_artifacts:
+    - data/pet_stats.json
+    - data/processed/examples_oxford/*
+    - data/DATAOPS.md
+    - data/data_governance.yaml
+  operational_reports_path: monitoring/
+
+schema:
+  input_type: image
+  accepted_formats:
+    - jpg
+    - jpeg
+    - png
+  color_mode: RGB
+  min_width_px: 50
+  min_height_px: 50
+  model_input:
+    channels: 3
+    height: 224
+    width: 224
+
+splits:
+  strategy: seeded_random_split
+  validation_fraction: 0.2
+  seed: 42
+  stratified_expected: true
+
+preprocessing:
+  train:
+    - Resize to int(img_size * 1.14)
+    - RandomResizedCrop(img_size, scale=(0.6, 1.0))
+    - RandomHorizontalFlip(p=0.5)
+    - ColorJitter(0.2, 0.2, 0.2, 0.1)
+    - ToTensor
+    - Normalize(loc, scale)
+  validation_and_inference:
+    - Resize to int(img_size * 1.14)
+    - CenterCrop(img_size)
+    - ToTensor
+    - Normalize(loc, scale)
+  normalization_contract: data/pet_stats.json
+
+quality_checks:
+  required:
+    - dataset_available
+    - non_empty_train_split
+    - non_empty_validation_split
+    - expected_classes_present
+    - normalization_has_three_channels
+    - model_input_size_matches_config
+  warning_thresholds:
+    max_validation_fraction_delta: 0.05
+    min_class_support: 1
+
+monitoring_contract:
+  software:
+    - total_latency_ms
+    - preprocess_ms
+    - inference_ms
+    - requests_per_minute
+    - error_rate
+  data_drift:
+    - raw_channel_mean
+    - raw_channel_std
+  model_drift:
+    - confidence
+    - uncertain_rate
+    - prediction_distribution
+  problem_drift:
+    - true_label_distribution
+  performance:
+    - accuracy
+    - precision
+    - recall
+    - f1
+    - roc_auc

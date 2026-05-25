@@ -1,5 +1,6 @@
 import argparse
 import json
+import math
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -38,22 +39,110 @@ def _parse_ts(ts: Any) -> datetime | None:
         return None
 
 
-def _compute_feedback_accuracy(feedback_events: list[dict[str, Any]]) -> tuple[int, float | None]:
-    vals: list[bool] = []
-    for e in feedback_events:
-        if isinstance(e.get("prediction_correct"), bool):
-            vals.append(bool(e["prediction_correct"]))
-            continue
+def _positive_score(event: dict[str, Any], positive_label: str) -> float | None:
+    scores = event.get("scores")
+    if isinstance(scores, dict):
+        normalized_scores = {str(k).strip().lower(): v for k, v in scores.items()}
+        if positive_label in normalized_scores:
+            return _safe_float(normalized_scores.get(positive_label), math.nan)
+    if "positive_score" in event:
+        return _safe_float(event.get("positive_score"), math.nan)
+    if "confidence" in event and event.get("prediction") == positive_label:
+        return _safe_float(event.get("confidence"), math.nan)
+    return None
 
+
+def _binary_classification_metrics(y_true: list[int], y_pred: list[int]) -> dict[str, float]:
+    total = len(y_true)
+    correct = sum(1 for yt, yp in zip(y_true, y_pred) if yt == yp)
+    tp = sum(1 for yt, yp in zip(y_true, y_pred) if yt == 1 and yp == 1)
+    fp = sum(1 for yt, yp in zip(y_true, y_pred) if yt == 0 and yp == 1)
+    fn = sum(1 for yt, yp in zip(y_true, y_pred) if yt == 1 and yp == 0)
+
+    accuracy = correct / total if total else 0.0
+    precision = tp / (tp + fp) if (tp + fp) else 0.0
+    recall = tp / (tp + fn) if (tp + fn) else 0.0
+    f1 = (2 * precision * recall / (precision + recall)) if (precision + recall) else 0.0
+    return {
+        "accuracy": float(accuracy),
+        "precision": float(precision),
+        "recall": float(recall),
+        "f1": float(f1),
+    }
+
+
+def _binary_roc_auc(y_true: list[int], y_score: list[float]) -> float | None:
+    positives = sum(1 for y in y_true if y == 1)
+    negatives = sum(1 for y in y_true if y == 0)
+    if positives == 0 or negatives == 0 or len(y_true) != len(y_score):
+        return None
+
+    ranked = sorted(zip(y_score, y_true), key=lambda item: item[0])
+    rank_sum_pos = 0.0
+    idx = 0
+    while idx < len(ranked):
+        end = idx + 1
+        while end < len(ranked) and ranked[end][0] == ranked[idx][0]:
+            end += 1
+        avg_rank = (idx + 1 + end) / 2.0
+        rank_sum_pos += avg_rank * sum(1 for _, label in ranked[idx:end] if label == 1)
+        idx = end
+
+    auc = (rank_sum_pos - positives * (positives + 1) / 2.0) / (positives * negatives)
+    return float(auc)
+
+
+def _compute_feedback_metrics(
+    feedback_events: list[dict[str, Any]],
+    *,
+    positive_label: str = "dog",
+) -> dict[str, Any]:
+    positive_label = positive_label.strip().lower()
+    y_true: list[int] = []
+    y_pred: list[int] = []
+    y_score: list[float] = []
+
+    for e in feedback_events:
         pred = e.get("prediction")
         true_label = e.get("true_label")
         if isinstance(pred, str) and isinstance(true_label, str):
-            vals.append(pred.strip().lower() == true_label.strip().lower())
+            pred_norm = pred.strip().lower()
+            true_norm = true_label.strip().lower()
+            y_true.append(1 if true_norm == positive_label else 0)
+            y_pred.append(1 if pred_norm == positive_label else 0)
 
-    if not vals:
-        return 0, None
-    acc = sum(1 for x in vals if x) / len(vals)
-    return len(vals), float(acc)
+            score = _positive_score(e, positive_label)
+            if score is not None and not math.isnan(score):
+                y_score.append(float(score))
+            continue
+
+        if isinstance(e.get("prediction_correct"), bool):
+            y_true.append(1)
+            y_pred.append(1 if e["prediction_correct"] else 0)
+
+    if not y_true:
+        return {
+            "samples": 0,
+            "accuracy": None,
+            "precision": None,
+            "recall": None,
+            "f1": None,
+            "roc_auc": None,
+        }
+
+    base_metrics = _binary_classification_metrics(y_true, y_pred)
+    roc_auc = None
+    if len(y_score) == len(y_true) and len(set(y_true)) > 1:
+        roc_auc = _binary_roc_auc(y_true, y_score)
+
+    return {
+        "samples": len(y_true),
+        "accuracy": base_metrics["accuracy"],
+        "precision": base_metrics["precision"],
+        "recall": base_metrics["recall"],
+        "f1": base_metrics["f1"],
+        "roc_auc": roc_auc,
+    }
 
 
 def evaluate_model_health(
@@ -69,6 +158,8 @@ def evaluate_model_health(
     max_uncertain_rate: float = 0.40,
     min_feedback_samples: int = 20,
     min_feedback_accuracy: float = 0.80,
+    min_feedback_roc_auc: float = 0.80,
+    positive_label: str = "dog",
 ) -> dict[str, Any]:
     events = _load_jsonl(inference_log_path, window_size=window_size)
     samples = len(events)
@@ -98,7 +189,10 @@ def evaluate_model_health(
         is_stale = (now - latest_ts) > timedelta(hours=stale_hours)
 
     feedback_events = _load_jsonl(feedback_log_path, window_size=window_size)
-    feedback_count, feedback_acc = _compute_feedback_accuracy(feedback_events)
+    feedback_metrics = _compute_feedback_metrics(feedback_events, positive_label=positive_label)
+    feedback_count = int(feedback_metrics["samples"])
+    feedback_acc = feedback_metrics["accuracy"]
+    feedback_auc = feedback_metrics["roc_auc"]
 
     degraded_conf = avg_conf < min_avg_confidence
     degraded_uncertain = uncertain_rate > max_uncertain_rate
@@ -106,6 +200,11 @@ def evaluate_model_health(
         feedback_acc is not None
         and feedback_count >= min_feedback_samples
         and feedback_acc < min_feedback_accuracy
+    )
+    degraded_feedback_auc = (
+        feedback_auc is not None
+        and feedback_count >= min_feedback_samples
+        and feedback_auc < min_feedback_roc_auc
     )
 
     if samples < min_samples:
@@ -115,7 +214,7 @@ def evaluate_model_health(
     else:
         status = "ok"
 
-    degraded = bool(degraded_conf or degraded_uncertain or degraded_feedback)
+    degraded = bool(degraded_conf or degraded_uncertain or degraded_feedback or degraded_feedback_auc)
     report = {
         "timestamp_utc": now.isoformat(),
         "status": status,
@@ -128,6 +227,10 @@ def evaluate_model_health(
             "uncertain_rate": uncertain_rate,
             "feedback_samples": feedback_count,
             "feedback_accuracy": feedback_acc,
+            "feedback_precision": feedback_metrics["precision"],
+            "feedback_recall": feedback_metrics["recall"],
+            "feedback_f1": feedback_metrics["f1"],
+            "feedback_roc_auc": feedback_auc,
         },
         "thresholds": {
             "min_avg_confidence": min_avg_confidence,
@@ -135,12 +238,15 @@ def evaluate_model_health(
             "max_uncertain_rate": max_uncertain_rate,
             "min_feedback_samples": min_feedback_samples,
             "min_feedback_accuracy": min_feedback_accuracy,
+            "min_feedback_roc_auc": min_feedback_roc_auc,
+            "positive_label": positive_label,
             "stale_hours": stale_hours,
         },
         "signals": {
             "degraded_confidence": degraded_conf,
             "degraded_uncertainty": degraded_uncertain,
             "degraded_feedback_accuracy": degraded_feedback,
+            "degraded_feedback_roc_auc": degraded_feedback_auc,
             "stale_stream": is_stale,
         },
     }
@@ -163,6 +269,8 @@ def parse_args():
     parser.add_argument("--max-uncertain-rate", type=float, default=0.40)
     parser.add_argument("--min-feedback-samples", type=int, default=20)
     parser.add_argument("--min-feedback-accuracy", type=float, default=0.80)
+    parser.add_argument("--min-feedback-roc-auc", type=float, default=0.80)
+    parser.add_argument("--positive-label", type=str, default="dog")
     return parser.parse_args()
 
 
@@ -180,6 +288,8 @@ def main():
         max_uncertain_rate=args.max_uncertain_rate,
         min_feedback_samples=args.min_feedback_samples,
         min_feedback_accuracy=args.min_feedback_accuracy,
+        min_feedback_roc_auc=args.min_feedback_roc_auc,
+        positive_label=args.positive_label,
     )
 
     print(f"[OK] Reporte de salud: {args.report_path}")
@@ -189,4 +299,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

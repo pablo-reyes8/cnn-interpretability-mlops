@@ -42,10 +42,12 @@ The goal is to provide an advanced, reliable classification and explanation tool
 
 - **`app/`** — user interface (Streamlit) to upload images/URLs and explore explanations
 
-- **`data/`** — data prep and statistics
+- **`data/`** — DataOps, data contracts, preprocessing and statistics
 
   - `processed/` — working directory (do not version raw data)
   - `pet_stats.json` — means/standard deviations for reproducible normalization
+  - `DATAOPS.md` and `data_governance.yaml` — explicit governance and data contract
+  - `create_dataset/preprocess_training_data.py` — reproducible training preprocessing report
 
 - **`notebooks/`** — data-flow verification and model sanity checks
 
@@ -55,7 +57,7 @@ The goal is to provide an advanced, reliable classification and explanation tool
 
 - **`scripts/`** and **`resnet101/scripts/`** — project CLIs (API/app launch, ingest, train, infer)
 
-- **`monitoring/`** — operational reports (drift, model health, quality gates, deployment history, rollback history)
+- **`monitoring/`** — operational reports (software metrics, drift, model health, quality gates, deployment history, rollback history)
 
 ---
 
@@ -280,6 +282,33 @@ python3 resnet101/scripts/cli_infer.py \
   --image-path data/processed/examples_oxford/cat_example.jpg --pretty
 ```
 
+### DataOps and Monitoring CLIs
+
+```bash
+# DataOps contract/preprocessing report
+python3 data/create_dataset/preprocess_training_data.py \
+  --config-path resnet101/oxford_pets_binary_resnet101.yaml \
+  --report-path monitoring/dataops_preprocess_report.json
+
+# Software monitoring: latency, inference time and endpoint counts
+python3 -m src.mlops.software_monitor \
+  --inference-log-path monitoring/inference_events.jsonl \
+  --report-path monitoring/software_metrics_report.json
+
+# Drift monitoring: data, model, problem and concept drift
+python3 -m src.mlops.detect_drift \
+  --reference-stats-path data/pet_stats.json \
+  --inference-log-path monitoring/inference_events.jsonl \
+  --feedback-log-path monitoring/feedback_events.jsonl \
+  --report-path monitoring/drift_report.json
+
+# Model health: confidence plus supervised metrics when feedback exists
+python3 -m src.mlops.evaluate_model_health \
+  --inference-log-path monitoring/inference_events.jsonl \
+  --feedback-log-path monitoring/feedback_events.jsonl \
+  --report-path monitoring/model_health_report.json
+```
+
 ---
 
 ##  MLOps Lifecycle (Implemented)
@@ -287,20 +316,24 @@ python3 resnet101/scripts/cli_infer.py \
 This repository now includes a complete operational MLOps loop:
 
 1. **Ingestion** (`ingestion` service / `cli_ingest.py`)
-2. **Training + Tracking** (`training` service / MLflow)
-3. **Quality Gate** (`src/mlops/quality_gate.py`)
-4. **Promotion to deployment model** (`src/mlops/deployment_manager.py --action promote`)
-5. **API deployment** (`deploy` service)
-6. **Monitoring**:
-   - Drift detection (`src/mlops/detect_drift.py`)
-   - Model health (`src/mlops/evaluate_model_health.py`)
-7. **Automatic retraining decision** (Airflow DAG branching)
-8. **Automatic rollback** if quality gate fails or post-deploy health degrades
+2. **DataOps preprocessing contract** (`data/create_dataset/preprocess_training_data.py`)
+3. **Training + Tracking** (`training` service / MLflow)
+4. **Quality Gate** (`src/mlops/quality_gate.py`)
+5. **Promotion to deployment model** (`src/mlops/deployment_manager.py --action promote`)
+6. **API deployment** (`deploy` service)
+7. **Monitoring**:
+   - Software metrics: latency, preprocessing time, inference time and endpoint counts (`src/mlops/software_monitor.py`)
+   - Drift detection: data drift, model drift, problem drift and concept drift (`src/mlops/detect_drift.py`)
+   - Model health: confidence, uncertainty, accuracy, precision, recall, F1 and ROC-AUC (`src/mlops/evaluate_model_health.py`)
+8. **Automatic retraining decision** (Airflow DAG branching)
+9. **Automatic rollback** if quality gate fails or post-deploy health degrades
 
 Operational reports are stored in `monitoring/` (JSON/JSONL), including:
 
 - `drift_report.json`
+- `software_metrics_report.json`
 - `model_health_report.json`
+- `dataops_preprocess_report.json`
 - `quality_gate_report_*.json`
 - `deployment_history.jsonl`
 - `rollback_history.jsonl`

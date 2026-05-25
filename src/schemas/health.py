@@ -6,5 +6,6 @@ class HealthResponse(BaseModel):
     version: str = Field(..., description="Versión del modelo.")
     device: str = Field(..., description="Dispositivo en uso (cpu/cuda).")
     input_size: int = Field(..., description="Tamaño de entrada esperado.")
+    classes: list[str] = Field(..., description="Clases soportadas por el modelo.")
 
     

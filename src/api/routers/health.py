@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from src.api.deps import get_device, get_model_version
+from src.api.deps import get_device, get_id_to_label, get_model_version
 from src.schemas.health import HealthResponse
 
 router = APIRouter(tags=["health"])
@@ -16,5 +16,5 @@ def health():
         "model": "ResNet101",
         "version": get_model_version(),
         "device": get_device(),
-        "input_size": 224,}
-
+        "input_size": 224,
+        "classes": list(get_id_to_label().values()),}

@@ -3,7 +3,7 @@ import os
 from datetime import datetime, timezone
 from functools import lru_cache
 from pathlib import Path
-from typing import Dict, Iterable
+from typing import Any, Dict, Iterable
 
 import torch
 
@@ -68,6 +68,13 @@ def log_inference_event(
     model_version: str,
     device: str,
     stats_path: str | None = None,
+    preprocess_ms: float | None = None,
+    inference_ms: float | None = None,
+    total_latency_ms: float | None = None,
+    input_width: int | None = None,
+    input_height: int | None = None,
+    status: str = "ok",
+    extra: dict[str, Any] | None = None,
 ) -> None:
     raw = _unnormalize_tensor(tensor, stats_path=stats_path)
     means = raw.mean(dim=(1, 2)).tolist()
@@ -82,10 +89,18 @@ def log_inference_event(
         "confidence": confidence,
         "model_version": model_version,
         "device": device,
+        "status": status,
+        "preprocess_ms": float(preprocess_ms) if preprocess_ms is not None else None,
+        "inference_ms": float(inference_ms) if inference_ms is not None else None,
+        "total_latency_ms": float(total_latency_ms) if total_latency_ms is not None else None,
+        "input_width": int(input_width) if input_width is not None else None,
+        "input_height": int(input_height) if input_height is not None else None,
         "raw_channel_mean": _to_float_list(means),
         "raw_channel_std": _to_float_list(stds),
         "input_size": int(raw.shape[-1]),
     }
+    if extra:
+        record["extra"] = extra
 
     path = _log_path()
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -102,6 +117,13 @@ def safe_log_inference_event(
     model_version: str,
     device: str,
     stats_path: str | None = None,
+    preprocess_ms: float | None = None,
+    inference_ms: float | None = None,
+    total_latency_ms: float | None = None,
+    input_width: int | None = None,
+    input_height: int | None = None,
+    status: str = "ok",
+    extra: dict[str, Any] | None = None,
 ) -> None:
     if not _enabled():
         return
@@ -114,6 +136,13 @@ def safe_log_inference_event(
             model_version=model_version,
             device=device,
             stats_path=stats_path,
+            preprocess_ms=preprocess_ms,
+            inference_ms=inference_ms,
+            total_latency_ms=total_latency_ms,
+            input_width=input_width,
+            input_height=input_height,
+            status=status,
+            extra=extra,
         )
     except Exception as exc:
         print(f"[monitor] No se pudo registrar evento de inferencia: {exc}")

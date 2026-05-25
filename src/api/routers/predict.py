@@ -103,6 +103,7 @@ async def predict(
     file: Optional[UploadFile] = File(default=None, description="Imagen JPEG/PNG"),
     url: Optional[str] = Form(default=None, description="URL http/https a una imagen")):
 
+    request_t0 = time.perf_counter()
     out = await _prep_input_from_request(file, url)
     x = out["tensor"]
     meta = dict(out.get("meta", {}))
@@ -115,6 +116,8 @@ async def predict(
         logits = model(x)
         probs = torch.softmax(logits, dim=1).squeeze(0).cpu().tolist()
     t1 = time.perf_counter()
+    inference_ms = round((t1 - t0) * 1000, 2)
+    total_latency_ms = round((time.perf_counter() - request_t0) * 1000, 2)
 
     scores: Dict[str, float] = {id_to_label.get(i, str(i)): float(p) for i, p in enumerate(probs)}
     label = max(scores.items(), key=lambda kv: kv[1])[0]
@@ -127,11 +130,17 @@ async def predict(
         source=source,
         model_version=get_model_version(),
         device=get_device(),
+        preprocess_ms=meta.get("preprocess_ms"),
+        inference_ms=inference_ms,
+        total_latency_ms=total_latency_ms,
+        input_width=meta.get("width"),
+        input_height=meta.get("height"),
     )
 
     meta.update(
         {
-            "inference_ms": round((t1 - t0) * 1000, 2),
+            "inference_ms": inference_ms,
+            "total_latency_ms": total_latency_ms,
             "model_version": get_model_version(),
             "device": get_device(),})
     return {"label": label, "scores": scores, "meta": meta}
@@ -156,6 +165,7 @@ async def predict_advanced(
     url: Optional[str] = Form(default=None, description="URL http/https a una imagen"),
     what: str = Form(default="all", description="Qué artefactos retornar (all | lista separada por comas)")):
 
+    request_t0 = time.perf_counter()
     out = await _prep_input_from_request(file, url)
     x = out["tensor"]
     meta = dict(out.get("meta", {}))
@@ -168,19 +178,11 @@ async def predict_advanced(
         logits = model(x)
         probs = torch.softmax(logits, dim=1).squeeze(0).cpu().tolist()
     t1 = time.perf_counter()
+    inference_ms = round((t1 - t0) * 1000, 2)
 
     scores: Dict[str, float] = {id_to_label.get(i, str(i)): float(p) for i, p in enumerate(probs)}
     label = max(scores.items(), key=lambda kv: kv[1])[0]
     source = "file" if file is not None else "url"
-
-    safe_log_inference_event(
-        tensor=x,
-        scores=scores,
-        endpoint="/predict/advanced",
-        source=source,
-        model_version=get_model_version(),
-        device=get_device(),
-    )
 
     requested: List[str] = (
         ["kernels", "feature_maps", "gradcam", "integrated_gradients", "occlusion"]
@@ -273,10 +275,26 @@ async def predict_advanced(
 
     meta.update(
         {
-            "inference_ms": round((t1 - t0) * 1000, 2),
+            "inference_ms": inference_ms,
+            "total_latency_ms": round((time.perf_counter() - request_t0) * 1000, 2),
             "model_version": get_model_version(),
             "device": get_device(),
             "requested": requested,})
+
+    safe_log_inference_event(
+        tensor=x,
+        scores=scores,
+        endpoint="/predict/advanced",
+        source=source,
+        model_version=get_model_version(),
+        device=get_device(),
+        preprocess_ms=meta.get("preprocess_ms"),
+        inference_ms=inference_ms,
+        total_latency_ms=meta.get("total_latency_ms"),
+        input_width=meta.get("width"),
+        input_height=meta.get("height"),
+        extra={"requested_interpretability": requested},
+    )
 
     return {
         "label": label,

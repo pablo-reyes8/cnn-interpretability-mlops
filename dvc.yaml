@@ -1,4 +1,36 @@
 stages:
+  dataops_preprocess:
+    cmd: >-
+      python3 data/create_dataset/preprocess_training_data.py
+      --config-path ${dataops.config_path}
+      --report-path ${dataops.preprocess_report_path}
+    deps:
+      - ${dataops.config_path}
+      - data/DATAOPS.md
+      - data/data_governance.yaml
+      - data/create_dataset/preprocess_training_data.py
+      - resnet101/src/data/load_data.py
+      - resnet101/src/data/utils_data.py
+    params:
+      - params.yaml:
+          - dataops.config_path
+          - dataops.preprocess_report_path
+      - resnet101/oxford_pets_binary_resnet101.yaml:
+          - experiment.seed
+          - data.dataset
+          - data.task
+          - data.data_dir
+          - data.img_size
+          - data.loader.batch_size
+          - data.loader.num_workers
+          - data.split.val_split
+          - data.normalization.robust
+          - data.normalization.stats_cache_path
+          - data.normalization.use_cached_if_available
+    metrics:
+      - ${dataops.preprocess_report_path}:
+          cache: false
+
   train_resnet101_mlflow:
     cmd: >-
       python3 -m resnet101.src.training.train_mlflow
@@ -43,3 +75,56 @@ stages:
     outs:
       - ${train.output_dir}/best_model.pth
       - ${train.output_dir}/last_model.pth
+
+  monitor_software:
+    cmd: >-
+      python3 -m src.mlops.software_monitor
+      --inference-log-path ${monitoring.inference_log_path}
+      --report-path ${monitoring.software_report_path}
+    deps:
+      - src/mlops/software_monitor.py
+    params:
+      - params.yaml:
+          - monitoring.inference_log_path
+          - monitoring.software_report_path
+    metrics:
+      - ${monitoring.software_report_path}:
+          cache: false
+
+  monitor_drift:
+    cmd: >-
+      python3 -m src.mlops.detect_drift
+      --reference-stats-path data/pet_stats.json
+      --inference-log-path ${monitoring.inference_log_path}
+      --feedback-log-path ${monitoring.feedback_log_path}
+      --report-path ${monitoring.drift_report_path}
+      --exit-code-on-drift 0
+    deps:
+      - data/pet_stats.json
+      - src/mlops/detect_drift.py
+      - src/mlops/drift_core.py
+    params:
+      - params.yaml:
+          - monitoring.inference_log_path
+          - monitoring.feedback_log_path
+          - monitoring.drift_report_path
+    metrics:
+      - ${monitoring.drift_report_path}:
+          cache: false
+
+  monitor_model_health:
+    cmd: >-
+      python3 -m src.mlops.evaluate_model_health
+      --inference-log-path ${monitoring.inference_log_path}
+      --feedback-log-path ${monitoring.feedback_log_path}
+      --report-path ${monitoring.model_health_report_path}
+    deps:
+      - src/mlops/evaluate_model_health.py
+    params:
+      - params.yaml:
+          - monitoring.inference_log_path
+          - monitoring.feedback_log_path
+          - monitoring.model_health_report_path
+    metrics:
+      - ${monitoring.model_health_report_path}:
+          cache: false

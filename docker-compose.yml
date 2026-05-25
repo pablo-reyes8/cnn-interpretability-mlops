@@ -9,6 +9,7 @@ services:
       --stats-path /workspace/data/pet_stats.json
       --report-path /workspace/monitoring/ingestion_report.json
     volumes:
+      - ./config:/workspace/config
       - ./data:/workspace/data
       - ./monitoring:/workspace/monitoring
     restart: "no"
@@ -23,6 +24,7 @@ services:
       --output-dir /workspace/resnet101/model_trained/mlops
       --tracking-uri file:/workspace/resnet101/mlruns
     volumes:
+      - ./config:/workspace/config
       - ./data:/workspace/data
       - ./resnet101:/workspace/resnet101
       - ./monitoring:/workspace/monitoring
@@ -42,6 +44,7 @@ services:
       ENABLE_INFERENCE_LOGGING: "true"
       INFERENCE_LOG_PATH: /workspace/monitoring/inference_events.jsonl
     volumes:
+      - ./config:/workspace/config
       - ./data:/workspace/data
       - ./resnet101:/workspace/resnet101
       - ./monitoring:/workspace/monitoring
